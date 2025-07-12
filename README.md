@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/carmania_logo.png" alt="CARMANIA Logo" width="300"/>
+  <img src="carmania_logo.png" alt="CARMANIA Logo" width="300"/>
 </p>
 
 # CARMANIA
