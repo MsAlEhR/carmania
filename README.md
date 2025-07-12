@@ -1,10 +1,11 @@
-<p align="center">
-  <img src="carmania_logo.png" alt="CARMANIA Logo" width="300"/>
-</p>
 
 # CARMANIA
 
 **Context-Aware Regularization with Markovian Integration for Attention-Based Nucleotide Analysis**
+
+<p align="center">
+  <img src="carmania_logo.png" alt="CARMANIA Logo" width="300"/>
+</p>
 
 > 🚧 This repository is under active development and will be updated very soon with full training code, evaluation scripts, and usage examples. Stay tuned!
 
