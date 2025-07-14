@@ -7,7 +7,7 @@ from transformers import get_scheduler
 from Bio import SeqIO
 from typing import List, Tuple, Optional
 import numpy as np
-
+from torch import nn
 from carmania.tokenization_carmania import CarmaniaTokenizer
 from carmania.carmania_modeling import CarmaniaModel
 from carmania.carmania_configuration import CarmaniaConfig
@@ -37,7 +37,7 @@ class DNASequenceDataset(Dataset):
     def __getitem__(self, idx):
         return {
             "input_ids": self.input_ids[idx],
-            "labels": self.bigrams[idx]
+            "bigrams": self.bigrams[idx]
         }
 
 # === Training function ===
@@ -48,6 +48,7 @@ def train(
     epochs=4,
     learning_rate=5e-4,
     model_name="carmania",
+    beta= 1 ,
     device="cuda:0"
 ):
     wandb.init(project="carmania", name=model_name)
@@ -58,7 +59,8 @@ def train(
     dataset = DNASequenceDataset(fasta_path, tokenizer, max_sequences=max_sequences)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
     model = CarmaniaModel(config).to(device)
-    loss_fn = TMLoss()
+    TM_loss = TMLoss()
+    NT_loss = nn.CrossEntropyLoss(ignore_index=4) # [PAd]==4
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     scaler = GradScaler()
@@ -70,11 +72,18 @@ def train(
         total_loss = 0
         for step, batch in enumerate(dataloader):
             input_ids = batch["input_ids"].to(device)
-            labels = batch["labels"].to(device)
+            bigrams = batch["bigrams"].to(device)
 
             with autocast():
-                logits = model(input_ids)[0]
-                loss = loss_fn(logits, labels)
+                logits = model(input_ids[:, :-1])
+                
+                loss1 = NT_loss( 
+                    logits.reshape(-1, logits.size(-1)),
+                    input_ids[:, 1:].reshape(-1))
+                
+                loss2 = TM_loss(logits, bigrams)
+
+                loss = loss1 + loss2*beta  
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -84,7 +93,7 @@ def train(
 
             total_loss += loss.item()
             if step % 20 == 0:
-                wandb.log({"step_loss": loss.item(), "epoch": epoch+1})
+                wandb.log({"step_loss": loss.item(), "epoch": epoch+1 , "tm_loss": loss2.item() , "nt_loss":loss1.item(),"learning_rate": scheduler.get_last_lr()[0]})
 
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch {epoch+1}/{epochs} - Avg Loss: {avg_loss:.4f}")
@@ -95,5 +104,5 @@ def train(
 
 # === Run ===
 if __name__ == "__main__":
-    fasta_path = "../../../data/human_sequences.fa" 
+    fasta_path = "./human_sequences.fa" 
     train(fasta_path)
